@@ -182,17 +182,24 @@ async def _run_repl(
             break
 
         if user_input.startswith("/"):
-            # Handle slash commands
             cmd_name = user_input.split()[0][1:]
+            handled = await _handle_builtin_command(
+                cmd_name, user_input, commands, engine
+            )
+            if handled:
+                continue
             from hare.commands import find_command
             cmd = find_command(cmd_name, commands)
             if cmd is None:
-                print(f"Unknown command: {user_input}")
+                print(f"Unknown command: /{cmd_name}")
+                print("Type /help for available commands.")
                 continue
             if cmd.type == "local":
                 try:
                     result = await cmd.call(user_input, {})
-                    print(result.get("text", str(result)))
+                    text = result.get("text", "")
+                    if text:
+                        print(text)
                 except Exception as e:
                     print(f"Error: {e}")
                 continue
@@ -208,6 +215,81 @@ async def _run_repl(
                     errors = msg.get("errors", [])
                     for err in errors:
                         print(f"Error: {err}")
+
+
+async def _handle_builtin_command(
+    name: str,
+    raw_input: str,
+    commands: list[Any],
+    engine: Any,
+) -> bool:
+    """Handle built-in slash commands. Returns True if handled."""
+    if name == "help":
+        print("\nAvailable commands:\n")
+        for cmd in commands:
+            aliases = ""
+            if cmd.aliases:
+                aliases = f" (aliases: {', '.join('/' + a for a in cmd.aliases)})"
+            print(f"  /{cmd.name:12s}  {cmd.description}{aliases}")
+        print()
+        return True
+
+    if name == "exit" or name == "quit":
+        print("Goodbye!")
+        sys.exit(0)
+
+    if name == "clear":
+        os.system("cls" if os.name == "nt" else "clear")
+        return True
+
+    if name == "cost":
+        from hare.cost_tracker import get_total_cost, get_model_usage
+        cost = get_total_cost()
+        usage = get_model_usage()
+        print(f"\nSession cost: ${cost:.4f}")
+        print(f"  Input tokens:  {usage.get('input_tokens', 0):,}")
+        print(f"  Output tokens: {usage.get('output_tokens', 0):,}")
+        print()
+        return True
+
+    if name == "status":
+        from hare.bootstrap.state import get_session_id
+        from hare.utils.cwd import get_cwd
+        print(f"\nSession:  {get_session_id()}")
+        print(f"CWD:      {get_cwd()}")
+        print(f"Version:  {VERSION}")
+        print()
+        return True
+
+    if name == "model":
+        parts = raw_input.split(maxsplit=1)
+        if len(parts) > 1:
+            new_model = parts[1].strip()
+            engine._config.user_specified_model = new_model
+            print(f"Model switched to: {new_model}")
+        else:
+            current = engine._config.user_specified_model or "(default)"
+            print(f"Current model: {current}")
+            print("Usage: /model <model-name>")
+        return True
+
+    if name == "compact":
+        print("Compacting conversation... (stub — not yet implemented)")
+        return True
+
+    if name == "diff":
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["git", "diff", "--stat"], capture_output=True, text=True, timeout=10
+            )
+            output = result.stdout.strip()
+            print(f"\n{output if output else 'No changes.'}\n")
+        except Exception as e:
+            print(f"Error running git diff: {e}")
+        return True
+
+    return False
 
 
 async def _default_can_use_tool(
