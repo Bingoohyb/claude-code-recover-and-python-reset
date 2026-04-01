@@ -1,5 +1,8 @@
 # Hare — Claude Code Python Port
 
+
+# 家人们 我在做小型化移植到我机器人项目 所以重心都在机器人项目 请大佬见谅哈 当前是 opus4.6 写的 我没怎么测试 请见谅哈
+
 Hare 是 [Anthropic Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (v2.1.88) 的 Python 移植版本。源代码从 TypeScript/React (Ink) 架构忠实翻译为 Python 3.11+，保留了原始的模块结构、业务逻辑和数据流，同时排除了所有 UI 层（`.tsx` / React / Ink 组件）。
 
 ## 项目概览
